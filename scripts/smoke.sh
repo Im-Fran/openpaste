@@ -37,7 +37,8 @@ ok "binary paste -> $B"
 # unknown id is 404, oversized upload is rejected
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/paste/zzzzzzzz/raw")" = 404 ] || fail "404 on unknown id"
 head -c 2000000 /dev/zero | tr '\0' 'a' > "$TMP/big.txt"
-[ "$(curl -s -o /dev/null -w '%{http_code}' --data-binary @"$TMP/big.txt" "$URL")" = 413 ] || fail "size limit"
+SZ=$(curl -s -o /dev/null -w '%{http_code}' --data-binary @"$TMP/big.txt" "$URL")
+[ "$SZ" = 413 ] || fail "size limit (got $SZ)"
 ok "404 + size limit"
 
 # web UI: assets are reachable and the htmx form redirects to the new paste
