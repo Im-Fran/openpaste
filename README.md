@@ -8,6 +8,7 @@
 
 [![License](https://img.shields.io/github/license/Im-Fran/openpaste)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-2021-000?logo=rust)](Cargo.toml)
+[![ghcr.io](https://img.shields.io/github/v/tag/Im-Fran/openpaste?label=ghcr.io&logo=docker&color=2496ED)](https://github.com/Im-Fran/openpaste/pkgs/container/openpaste)
 
 </div>
 
@@ -211,7 +212,16 @@ cargo build --release --no-default-features
 
 ### Option A: Docker
 
-The image builds the UI, compiles the binary and ships a slim Debian runtime:
+Published images live at `ghcr.io/im-fran/openpaste`. Pick `latest` for the newest release or
+pin a version tag (`0.2.0`, `0.2`); `dev` tracks the development branch:
+
+```bash
+docker run -p 8080:8080 -v openpaste-data:/var/lib/openpaste \
+  -e BASE_URL=https://paste.example.com ghcr.io/im-fran/openpaste:latest
+```
+
+Or build it yourself — the image builds the UI, compiles the binary and ships a slim Debian
+runtime:
 
 ```bash
 docker build -t openpaste .
