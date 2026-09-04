@@ -22,5 +22,7 @@ ENV BIND=0.0.0.0:8080 \
     STORAGE_DRIVER=local \
     STORAGE_PATH=/var/lib/openpaste/blobs
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1
+# Un solo healthcheck para ambos modos: en HTTPS el primer curl falla y gana el segundo.
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD curl -fsS http://127.0.0.1:8080/healthz || curl -fsSk https://127.0.0.1:8080/healthz || exit 1
 CMD ["openpaste", "serve"]

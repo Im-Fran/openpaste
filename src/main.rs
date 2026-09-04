@@ -6,6 +6,7 @@ mod storage;
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
+use axum_server::tls_rustls::RustlsConfig;
 use config::Config;
 use qrcode::{render::unicode::Dense1x2, QrCode};
 use std::{
@@ -30,6 +31,15 @@ enum Cmd {
         /// Serve the API only, without the web UI
         #[arg(long)]
         headless: bool,
+        /// PEM certificate chain; enables HTTPS (overrides TLS_CERT)
+        #[arg(long, requires = "tls_key")]
+        tls_cert: Option<String>,
+        /// PEM private key (overrides TLS_KEY)
+        #[arg(long, requires = "tls_cert")]
+        tls_key: Option<String>,
+        /// Address for a plain-HTTP listener that 308s to BASE_URL (overrides HTTP_REDIRECT_BIND)
+        #[arg(long)]
+        http_redirect: Option<String>,
     },
     /// Upload a file (or stdin) and print the resulting URL
     Up {
@@ -59,19 +69,43 @@ async fn main() -> Result<()> {
             .unwrap_or_else(|_| "openpaste=info,tower_http=warn".into()))
         .init();
 
-    match Cli::parse().cmd.unwrap_or(Cmd::Serve { bind: None, headless: false }) {
-        Cmd::Serve { bind, headless } => serve(bind, headless).await,
+    let default =
+        Cmd::Serve { bind: None, headless: false, tls_cert: None, tls_key: None, http_redirect: None };
+    match Cli::parse().cmd.unwrap_or(default) {
+        Cmd::Serve { bind, headless, tls_cert, tls_key, http_redirect } => {
+            serve(bind, headless, tls_cert.zip(tls_key), http_redirect).await
+        }
         Cmd::Up { file, name, server } => up(file, name, server).await,
         Cmd::Get { id, server } => get(id, server).await,
     }
 }
 
-async fn serve(bind: Option<String>, headless: bool) -> Result<()> {
+async fn serve(
+    bind: Option<String>,
+    headless: bool,
+    tls: Option<(String, String)>,
+    http_redirect: Option<String>,
+) -> Result<()> {
     let mut cfg = Config::from_env()?;
     if let Some(b) = bind {
         cfg.bind = b;
     }
     cfg.headless |= headless;
+    if let Some((cert, key)) = tls {
+        cfg.tls = Some(config::Tls { cert, key });
+    }
+    if http_redirect.is_some() {
+        cfg.http_redirect = http_redirect;
+    }
+    if cfg.http_redirect.is_some() {
+        if cfg.tls.is_none() {
+            bail!("the HTTP redirect needs TLS_CERT/TLS_KEY — there is nothing to redirect to otherwise");
+        }
+        // Redirigir a un BASE_URL http:// sería un bucle, no una redirección.
+        if !cfg.base_url.starts_with("https://") {
+            bail!("the HTTP redirect needs an https:// BASE_URL, got '{}'", cfg.base_url);
+        }
+    }
 
     let state = routes::AppState {
         db: db::Db::connect(&cfg.database_url).await?,
@@ -79,11 +113,79 @@ async fn serve(bind: Option<String>, headless: bool) -> Result<()> {
         cfg: Arc::new(cfg.clone()),
     };
 
+    let app = routes::router(state);
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
-    tracing::info!("listening on http://{} (base_url {})", cfg.bind, cfg.base_url);
-    axum::serve(listener, routes::router(state))
-        .with_graceful_shutdown(async { tokio::signal::ctrl_c().await.ok(); })
+    let scheme = if cfg.tls.is_some() { "https" } else { "http" };
+    tracing::info!("listening on {scheme}://{} (base_url {})", cfg.bind, cfg.base_url);
+    if cfg.tls.is_some() && cfg.base_url.starts_with("http://") {
+        tracing::warn!("TLS is on but BASE_URL is http://; the links handed to clients will be wrong");
+    }
+
+    let Some(tls) = &cfg.tls else {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async { tokio::signal::ctrl_c().await.ok(); })
+            .await?;
+        return Ok(());
+    };
+
+    // rustls 0.23 exige elegir proveedor; ring ya viene con reqwest.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .map_err(|_| anyhow::anyhow!("failed to install the rustls crypto provider"))?;
+    let tls_cfg = RustlsConfig::from_pem_file(&tls.cert, &tls.key)
+        .await
+        .map_err(|e| anyhow::anyhow!("cannot load TLS_CERT '{}' / TLS_KEY '{}': {e}", tls.cert, tls.key))?;
+
+    if let Some(every) = cfg.tls_reload {
+        let (tls_cfg, cert, key) = (tls_cfg.clone(), tls.cert.clone(), tls.key.clone());
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(every).await;
+                match tls_cfg.reload_from_pem_file(&cert, &key).await {
+                    Ok(()) => tracing::debug!("TLS certificate reloaded from {cert}"),
+                    // Un cert a medio renovar no debe tumbar el server: seguimos con el anterior.
+                    Err(e) => tracing::warn!("TLS reload failed, keeping the current certificate: {e}"),
+                }
+            }
+        });
+    }
+
+    if let Some(redirect_bind) = &cfg.http_redirect {
+        serve_redirect(redirect_bind, cfg.base_url.clone()).await?;
+    }
+
+    let handle = axum_server::Handle::new();
+    tokio::spawn({
+        let handle = handle.clone();
+        async move {
+            tokio::signal::ctrl_c().await.ok();
+            handle.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
+        }
+    });
+    axum_server::from_tcp_rustls(listener.into_std()?, tls_cfg)?
+        .handle(handle)
+        .serve(app.into_make_service())
         .await?;
+    Ok(())
+}
+
+/// Plain-HTTP listener that 308s everything to `base_url`. The target comes from the
+/// config and never from the Host header, so it cannot be turned into an open redirect.
+async fn serve_redirect(bind: &str, base_url: String) -> Result<()> {
+    let listener = tokio::net::TcpListener::bind(bind).await?;
+    tracing::info!("redirecting http://{bind} to {base_url}");
+    tokio::spawn(async move {
+        let app = axum::Router::new().fallback(move |uri: axum::http::Uri| {
+            let base = base_url.clone();
+            async move {
+                let tail = uri.path_and_query().map(|p| p.as_str()).unwrap_or("/");
+                axum::response::Redirect::permanent(&format!("{base}{tail}"))
+            }
+        });
+        if let Err(e) = axum::serve(listener, app).await {
+            tracing::error!("the HTTP redirect listener stopped: {e}");
+        }
+    });
     Ok(())
 }
 

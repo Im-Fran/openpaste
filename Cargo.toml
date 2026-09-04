@@ -7,7 +7,7 @@ license = "MIT"
 
 [dependencies]
 axum = { version = "0.8", features = ["multipart"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-std", "signal"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-std", "signal", "time"] }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "any", "sqlite", "postgres"] }
 object_store = { version = "0.12", features = ["aws"] }
@@ -24,6 +24,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 rust-embed = { version = "8", optional = true }
 qrcode = { version = "0.14.1", default-features = false }
+# ponytail: -no-provider + rustls/ring reutiliza el ring que ya trae reqwest;
+# la feature "tls-rustls" arrastraría aws-lc-rs (cmake) al build de Docker.
+axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
 [features]
 default = ["frontend"]

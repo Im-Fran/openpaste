@@ -110,6 +110,10 @@ cp .env.example .env
 | `S3_PREFIX` | Key prefix inside the bucket | `openpaste` |
 | `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT` | Standard AWS credentials; `AWS_ENDPOINT` points at MinIO / R2 / other S3-compatible services | — |
 | `MAX_UPLOAD_BYTES` | Maximum upload size in bytes | `104857600` (100 MiB) |
+| `TLS_CERT` | PEM certificate chain — set together with `TLS_KEY` to serve HTTPS directly | — |
+| `TLS_KEY` | PEM private key for `TLS_CERT` | — |
+| `TLS_RELOAD_SECS` | How often the PEM files are re-read, so renewals apply without a restart; `0` disables it | `3600` |
+| `HTTP_REDIRECT_BIND` | Extra plain-HTTP listener that `308`s everything to `BASE_URL` | — |
 | `HEADLESS` | `true` to disable the web UI | `false` |
 | `RUST_LOG` | Log filter | `openpaste=info` |
 
@@ -120,6 +124,37 @@ cargo run -- serve
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
+
+### 5. HTTPS (optional)
+
+Set `TLS_CERT` and `TLS_KEY` (or pass `--tls-cert` / `--tls-key`) and openpaste terminates TLS
+itself — no reverse proxy needed. Both must be set, otherwise startup fails.
+
+```bash
+BIND=0.0.0.0:443 BASE_URL=https://paste.example.com \
+TLS_CERT=/etc/openpaste/tls/fullchain.pem TLS_KEY=/etc/openpaste/tls/privkey.pem \
+  openpaste serve
+```
+
+Binding to 443 needs privileges: the bundled systemd unit grants
+`AmbientCapabilities=CAP_NET_BIND_SERVICE`, and under Docker just map `-p 443:8080` instead.
+Leave both unset to serve plain HTTP behind nginx or Caddy.
+
+Point `TLS_CERT`/`TLS_KEY` at your Let's Encrypt `fullchain.pem` / `privkey.pem`. The files are
+re-read every `TLS_RELOAD_SECS` (1 h by default), so a `certbot renew` applies on its own — no
+restart, no deploy hook. A half-written certificate is logged as a warning and the current one
+stays in use.
+
+To also answer plain HTTP, add `HTTP_REDIRECT_BIND=0.0.0.0:80`: every request gets a `308` to
+`BASE_URL` with the path and query preserved. The target is built from `BASE_URL` rather than
+the `Host` header, so it cannot be turned into an open redirect. It requires TLS and an
+`https://` `BASE_URL` — otherwise startup fails instead of looping clients.
+
+```bash
+BIND=0.0.0.0:443 HTTP_REDIRECT_BIND=0.0.0.0:80 BASE_URL=https://paste.example.com \
+TLS_CERT=/etc/openpaste/tls/fullchain.pem TLS_KEY=/etc/openpaste/tls/privkey.pem \
+  openpaste serve
+```
 
 For frontend work, edit the templates in `assets/web/` (`layout.html`, `new.html`,
 `view_text.html`, `view_binary.html`, `style.css`) and re-run `cargo run -- serve`.
@@ -258,8 +293,9 @@ sudo systemctl status openpaste
 ```
 
 The unit runs as an unprivileged `openpaste` user with `ProtectSystem=strict` and only
-`/var/lib/openpaste` writable. Put nginx or Caddy in front for TLS, and make sure `BASE_URL`
-matches the public hostname — it is what the returned links are built from.
+`/var/lib/openpaste` writable. Either put nginx or Caddy in front for TLS or set
+`TLS_CERT`/`TLS_KEY` and bind to 443 directly, and make sure `BASE_URL` matches the public
+hostname — it is what the returned links are built from.
 
 ---
 

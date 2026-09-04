@@ -8,6 +8,15 @@ pub struct Config {
     pub storage: Storage,
     pub max_size: usize,
     pub headless: bool,
+    pub tls: Option<Tls>,
+    pub tls_reload: Option<std::time::Duration>,
+    pub http_redirect: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Tls {
+    pub cert: String,
+    pub key: String,
 }
 
 #[derive(Clone, Debug)]
@@ -32,6 +41,20 @@ impl Config {
             other => bail!("unknown STORAGE_DRIVER '{other}' (expected 'local' or 's3')"),
         };
 
+        // Ambos o ninguno: con solo uno de los dos el servidor arrancaría en
+        // texto plano sin que nadie se entere.
+        let tls = match (std::env::var("TLS_CERT").ok(), std::env::var("TLS_KEY").ok()) {
+            (Some(cert), Some(key)) => Some(Tls { cert, key }),
+            (None, None) => None,
+            _ => bail!("TLS_CERT and TLS_KEY must be set together"),
+        };
+
+        // Certbot renueva sin avisar: releer el PEM cada tanto evita el reinicio.
+        let tls_reload = match env("TLS_RELOAD_SECS", "3600").parse::<u64>()? {
+            0 => None,
+            secs => Some(std::time::Duration::from_secs(secs)),
+        };
+
         Ok(Config {
             bind: env("BIND", "0.0.0.0:8080"),
             base_url: env("BASE_URL", "http://localhost:8080").trim_end_matches('/').to_string(),
@@ -39,6 +62,9 @@ impl Config {
             storage,
             max_size: env("MAX_UPLOAD_BYTES", "104857600").parse()?,
             headless: env("HEADLESS", "false") == "true",
+            tls,
+            tls_reload,
+            http_redirect: std::env::var("HTTP_REDIRECT_BIND").ok(),
         })
     }
 }
