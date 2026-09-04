@@ -35,10 +35,11 @@ database; anything that isn't valid UTF-8 is stored as a blob on the local files
 The database is chosen at runtime from `DATABASE_URL`, so the same binary runs on SQLite for a
 personal instance and on PostgreSQL for a shared one.
 
-The frontend is a **Vite + React + TypeScript** SPA that is embedded into the binary at compile
-time. There is nothing to serve separately: `openpaste serve` ships the UI with it. If you don't
-want a UI at all, run `--headless` (or build without the `frontend` feature) and the service
-answers plain text to `curl` and nothing else.
+The frontend is **server-rendered HTML with [htmx](https://htmx.org)**. The templates and their
+CSS live in `assets/web/` as plain files and are embedded into the binary at compile time, so
+there is no build step and no Node.js — edit the HTML, rebuild, done. If you don't want a UI at
+all, run `--headless` (or build without the `frontend` feature) and the service answers plain
+text to `curl` and nothing else.
 
 ---
 
@@ -66,7 +67,7 @@ answers plain text to `curl` and nothing else.
 | Layer | Technology |
 |-------|-----------|
 | Backend | Rust 2021, [axum](https://github.com/tokio-rs/axum) 0.8, tokio |
-| Frontend | Vite 7, React 19, TypeScript 5 (embedded via `rust-embed`) |
+| Frontend | Server-rendered HTML + htmx 2 (`assets/web/`, embedded via `rust-embed`) |
 | Database | SQLite or PostgreSQL, via `sqlx` `Any` driver |
 | Blob storage | Local filesystem or S3, via `object_store` |
 | CLI | `clap` 4 + `reqwest` |
@@ -77,7 +78,6 @@ answers plain text to `curl` and nothing else.
 ## 📋 Requirements
 
 - **Rust** 1.80+ (`cargo`) — tested on 1.98
-- **Node.js** 20+ and **npm** — only needed to build the web UI
 - **Git**
 - Optional: **Docker** 24+ with Compose v2, or **PostgreSQL** 14+ for a non-SQLite instance
 
@@ -92,16 +92,7 @@ git clone https://github.com/Im-Fran/openpaste.git
 cd openpaste
 ```
 
-### 2. Build the web UI
-
-The bundle in `web/dist/` is embedded into the binary, so build it before `cargo build`:
-
-```bash
-npm --prefix web install
-npm --prefix web run build
-```
-
-### 3. Configure the environment
+### 2. Configure the environment
 
 ```bash
 cp .env.example .env
@@ -129,11 +120,8 @@ cargo run -- serve
 
 Open [http://localhost:8080](http://localhost:8080).
 
-For frontend work, run Vite separately — it proxies `/api` to the backend on port 8080:
-
-```bash
-npm --prefix web run dev
-```
+For frontend work, edit the templates in `assets/web/` (`layout.html`, `new.html`,
+`view_text.html`, `view_binary.html`, `style.css`) and re-run `cargo run -- serve`.
 
 ---
 
@@ -197,14 +185,13 @@ openpaste get x7Kf2a9Q > out.bin     # binaries stream through unchanged
 ## 🏗 Building for Production
 
 ```bash
-npm --prefix web install && npm --prefix web run build
 cargo build --release
 ```
 
 The binary lands in `target/release/openpaste` with the UI embedded — copy that one file to your
 server.
 
-To build without the frontend (smaller binary, no Node.js needed):
+To build without the frontend (smaller binary):
 
 ```bash
 cargo build --release --no-default-features

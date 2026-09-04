@@ -40,6 +40,14 @@ head -c 2000000 /dev/zero | tr '\0' 'a' > "$TMP/big.txt"
 [ "$(curl -s -o /dev/null -w '%{http_code}' --data-binary @"$TMP/big.txt" "$URL")" = 413 ] || fail "size limit"
 ok "404 + size limit"
 
+# web UI: assets are reachable and the htmx form redirects to the new paste
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/style.css")" = 200 ] || fail "asset /style.css"
+curl -sf "$URL" | grep -q 'hx-post="/ui/new"' || fail "index has the htmx form"
+H=$(curl -sf -D - -o /dev/null -F 'content=from the form' "$URL/ui/new" | tr -d '\r' | grep -i '^hx-redirect:' | awk '{print $2}')
+[ "$(curl -sf "$URL$H/raw")" = "from the form" ] || fail "form -> hx-redirect -> paste"
+curl -sf "$URL$H" | grep -q '<pre id="content">from the form</pre>' || fail "server-rendered paste view"
+ok "web ui -> $H"
+
 # CLI round-trip
 [ "$(echo 'via cli' | ./target/debug/openpaste up --server "$URL" | xargs -I{} ./target/debug/openpaste get {})" = "via cli" ] || fail "cli up/get"
 ok "cli up | get"

@@ -1,21 +1,13 @@
-# 1. Frontend bundle (skip with --build-arg by using the headless target below)
-FROM node:22-alpine AS web
-WORKDIR /web
-COPY web/package.json web/package-lock.json* ./
-RUN npm ci
-COPY web/ ./
-RUN npm run build
-
-# 2. Rust binary, with the bundle embedded
+# 1. Rust binary, with the HTML assets embedded
 FROM rust:1-slim AS build
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
+COPY assets ./assets
 COPY schema.sql ./
-COPY --from=web /web/dist ./web/dist
 RUN cargo build --release --locked
 
-# 3. Runtime
+# 2. Runtime
 FROM debian:bookworm-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \

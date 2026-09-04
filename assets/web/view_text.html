@@ -1,0 +1,13 @@
+<main>
+  <div class="meta">
+    <span>{{name}}</span>
+    <span class="muted">{{content_type}} · {{size}}</span>
+  </div>
+  <pre id="content">{{content}}</pre>
+  <div class="row">
+    <button onclick="navigator.clipboard.writeText(content.textContent); this.textContent = 'copied!'">copy</button>
+    <a class="button" href="/paste/{{id}}/raw">raw</a>
+    <a class="button" href="/paste/{{id}}/download">download</a>
+    <code class="hint">{{url}}</code>
+  </div>
+</main>

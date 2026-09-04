@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
-use axum::extract::DefaultBodyLimit;
+use axum::extract::{DefaultBodyLimit, Multipart};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
@@ -53,13 +53,19 @@ pub fn router(state: AppState) -> Router {
         .route("/api/pastes/{id}", get(api_get))
         .route("/paste/{id}", get(view))
         .route("/paste/{id}/raw", get(raw))
-        .route("/paste/{id}/download", get(download))
-        .route("/{filename}", put(create_named));
+        .route("/paste/{id}/download", get(download));
 
+    // `/{filename}` also swallows single-segment asset paths (/style.css, /icon.svg),
+    // so its GET has to be the asset handler rather than falling through to the fallback.
     app = if state.cfg.headless {
-        app.route("/", get(help)).fallback(help)
+        app.route("/", get(help))
+            .route("/{filename}", put(create_named).get(help))
+            .fallback(help)
     } else {
-        app.route("/", get(crate::frontend::index)).fallback(crate::frontend::asset)
+        app.route("/", get(crate::frontend::index))
+            .route("/ui/new", post(create_form))
+            .route("/{filename}", put(create_named).get(crate::frontend::asset))
+            .fallback(crate::frontend::asset)
     };
 
     app.layer(DefaultBodyLimit::max(limit))
@@ -88,12 +94,7 @@ async fn create(state: State<AppState>, headers: HeaderMap, body: Bytes) -> Resu
     store(state, name, headers, body).await
 }
 
-async fn store(
-    State(st): State<AppState>,
-    filename: Option<String>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<Response, AppError> {
+async fn save(st: &AppState, filename: Option<String>, body: Bytes) -> Result<Paste, AppError> {
     if body.is_empty() {
         return Err(AppError(StatusCode::BAD_REQUEST, "empty body".into()));
     }
@@ -127,7 +128,17 @@ async fn store(
         paste.storage_key = Some(id.clone());
     }
     st.db.insert(&paste).await?;
+    Ok(paste)
+}
 
+async fn store(
+    State(st): State<AppState>,
+    filename: Option<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, AppError> {
+    let paste = save(&st, filename, body).await?;
+    let id = &paste.id;
     let url = format!("{}/paste/{}", st.cfg.base_url, id);
     let wants_json = headers
         .get(header::ACCEPT)
@@ -146,6 +157,37 @@ async fn store(
     } else {
         (StatusCode::CREATED, format!("{url}\n")).into_response()
     })
+}
+
+/// Browser form submit (htmx). Takes the textarea or the picked/dropped file and
+/// answers with an HX-Redirect to the new paste.
+async fn create_form(State(st): State<AppState>, mut form: Multipart) -> Result<Response, AppError> {
+    let bad = |e: String| AppError(StatusCode::BAD_REQUEST, e);
+    let (mut filename, mut body) = (None, Bytes::new());
+    while let Some(field) = form.next_field().await.map_err(|e| bad(e.to_string()))? {
+        let name = field.name().unwrap_or_default().to_string();
+        let file_name = field.file_name().map(str::to_string);
+        let data = field.bytes().await.map_err(|e| bad(e.to_string()))?;
+        if data.is_empty() {
+            continue;
+        }
+        match name.as_str() {
+            // A picked file wins over whatever is in the textarea.
+            "file" => {
+                filename = file_name;
+                body = data;
+                break;
+            }
+            // Browsers submit textareas with CRLF line endings; store what was typed.
+            "content" if body.is_empty() => {
+                body = Bytes::from(String::from_utf8_lossy(&data).replace("\r\n", "\n"))
+            }
+            _ => {}
+        }
+    }
+
+    let paste = save(&st, filename, body).await?;
+    Ok((StatusCode::CREATED, [("hx-redirect", format!("/paste/{}", paste.id))]).into_response())
 }
 
 async fn api_get(State(st): State<AppState>, Path(id): Path<String>) -> Result<Response, AppError> {
@@ -184,5 +226,6 @@ async fn view(state: State<AppState>, path: Path<String>) -> Result<Response, Ap
     if state.0.cfg.headless {
         return raw(state, path).await;
     }
-    Ok(crate::frontend::index(state).await.into_response())
+    let p = state.db.get(&path.0).await?.ok_or_else(not_found)?;
+    Ok(crate::frontend::paste_page(&state, &p))
 }

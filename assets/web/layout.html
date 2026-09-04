@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Let htmx swap 4xx/5xx bodies too, so errors land in the page instead of being dropped. -->
+    <meta name="htmx-config" content='{"responseHandling":[{"code":"204","swap":false},{"code":".*","swap":true}]}' />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/htmx.min.js" defer></script>
+    <title>{{title}}</title>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <a href="/"><img src="/icon.svg" alt="" width="28" height="28" /><span>openpaste</span></a>
+      </header>
+      {{body}}
+    </div>
+  </body>
+</html>

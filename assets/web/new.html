@@ -1,0 +1,26 @@
+<main>
+  <form id="new" hx-post="/ui/new" hx-encoding="multipart/form-data" hx-target="#error" hx-disabled-elt="find button">
+    <textarea name="content" placeholder="Paste text or code here — or drop a file anywhere on this page." spellcheck="false" autofocus></textarea>
+    <p id="error" class="error"></p>
+    <div class="row">
+      <button type="submit">create paste</button>
+      <label class="file">
+        upload a file
+        <input type="file" name="file" hidden onchange="this.form.requestSubmit()" />
+      </label>
+      <code class="hint">echo 'hi' | curl --data-binary @- {{base_url}}</code>
+    </div>
+  </form>
+</main>
+
+<script>
+  // Drop a file anywhere: hand it to the form's file input and submit.
+  addEventListener('dragover', (e) => e.preventDefault())
+  addEventListener('drop', (e) => {
+    e.preventDefault()
+    if (!e.dataTransfer.files.length) return
+    const form = document.getElementById('new')
+    form.elements.file.files = e.dataTransfer.files
+    form.requestSubmit()
+  })
+</script>

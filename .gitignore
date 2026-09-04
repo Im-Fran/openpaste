@@ -1,7 +1,3 @@
 /target
 /data
-node_modules
-web/dist/*
-!web/dist/.gitkeep
 .env
-web/tsconfig.tsbuildinfo
