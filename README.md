@@ -248,7 +248,7 @@ cargo build --release --no-default-features
 ### Option A: Docker
 
 Published images live at `ghcr.io/im-fran/openpaste`. Pick `latest` for the newest release or
-pin a version tag (`0.2.0`, `0.2`); `dev` tracks the development branch:
+pin a version tag (`0.3.0`, `0.3`); `dev` tracks the development branch:
 
 ```bash
 docker run -p 8080:8080 -v openpaste-data:/var/lib/openpaste \
