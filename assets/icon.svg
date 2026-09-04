@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="openpaste terminal icon">
+  <rect x="2" y="6" width="60" height="52" rx="8" fill="#0d1117" stroke="#2ea043" stroke-width="3"/>
+  <path d="M2 18h60" stroke="#2ea043" stroke-width="3" opacity=".55"/>
+  <circle cx="11" cy="12" r="2.2" fill="#2ea043"/>
+  <circle cx="19" cy="12" r="2.2" fill="#2ea043" opacity=".6"/>
+  <circle cx="27" cy="12" r="2.2" fill="#2ea043" opacity=".35"/>
+  <path d="M14 30l9 8-9 8" fill="none" stroke="#3fb950" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="30" y="43" width="20" height="4.5" rx="2.25" fill="#3fb950"/>
+</svg>

@@ -1,0 +1,44 @@
+services:
+  openpaste:
+    build: .
+    image: openpaste:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      BASE_URL: ${BASE_URL:-http://localhost:8080}
+      DATABASE_URL: postgres://openpaste:${POSTGRES_PASSWORD:-openpaste}@db:5432/openpaste
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_PATH: /var/lib/openpaste/blobs
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-104857600}
+      # Only read when STORAGE_DRIVER=s3
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_PREFIX: ${S3_PREFIX:-openpaste}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-}
+    volumes:
+      - blobs:/var/lib/openpaste
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openpaste
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openpaste}
+      POSTGRES_DB: openpaste
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openpaste"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  blobs:
+  pgdata:

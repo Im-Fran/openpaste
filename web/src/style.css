@@ -1,0 +1,70 @@
+:root {
+  --bg: #0d1117;
+  --panel: #11161d;
+  --border: #21262d;
+  --fg: #c9d1d9;
+  --muted: #7d8590;
+  --accent: #3fb950;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.6 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.app { max-width: 900px; margin: 0 auto; padding: 24px 20px 64px; }
+
+header a {
+  display: inline-flex; align-items: center; gap: 10px;
+  color: var(--fg); text-decoration: none; font-size: 18px; letter-spacing: .04em;
+}
+header { margin-bottom: 20px; }
+
+main { display: flex; flex-direction: column; gap: 14px; }
+
+textarea, pre {
+  width: 100%; margin: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  padding: 14px;
+  font: inherit;
+  tab-size: 2;
+}
+
+textarea { min-height: 55vh; resize: vertical; }
+textarea:focus { outline: 1px solid var(--accent); }
+pre { overflow: auto; max-height: 70vh; white-space: pre; }
+
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+button, .button, .file {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 7px 14px;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+button:hover:not(:disabled), .button:hover, .file:hover { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:first-child { border-color: var(--accent); color: var(--accent); }
+
+.meta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+.muted { color: var(--muted); }
+.hint { color: var(--muted); margin-left: auto; overflow-wrap: anywhere; }
+.error { color: #f85149; }
+
+.binary {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--panel); border: 1px dashed var(--border); border-radius: 8px; padding: 24px;
+}
+.binary p { margin: 0; color: var(--muted); }

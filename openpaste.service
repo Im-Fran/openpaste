@@ -1,0 +1,30 @@
+[Unit]
+Description=openpaste
+Documentation=https://github.com/Im-Fran/openpaste
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=openpaste
+Group=openpaste
+ExecStart=/usr/local/bin/openpaste serve
+EnvironmentFile=/etc/openpaste/openpaste.env
+WorkingDirectory=/var/lib/openpaste
+StateDirectory=openpaste
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/openpaste
+
+[Install]
+WantedBy=multi-user.target
