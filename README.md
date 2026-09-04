@@ -165,6 +165,14 @@ openpaste get x7Kf2a9Q               # print the raw content to stdout
 openpaste get x7Kf2a9Q > out.bin     # binaries stream through unchanged
 ```
 
+`openpaste up` prints the URL on stdout and, when stderr is a terminal, an ASCII
+QR code of that URL on stderr — scan it with a phone. Piping or redirecting keeps
+the output clean:
+
+```bash
+openpaste up report.pdf | pbcopy   # only the URL, no QR
+```
+
 `--server` (or `OPENPASTE_SERVER`) points the client at your instance; it defaults to
 `http://localhost:8080`.
 

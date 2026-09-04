@@ -7,7 +7,11 @@ mod storage;
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use config::Config;
-use std::{io::Read, sync::Arc};
+use qrcode::{render::unicode::Dense1x2, QrCode};
+use std::{
+    io::{IsTerminal, Read},
+    sync::Arc,
+};
 
 #[derive(Parser)]
 #[command(name = "openpaste", version, about = "Paste service for text, terminal output and binaries")]
@@ -111,6 +115,12 @@ async fn up(file: Option<String>, name: Option<String>, server: String) -> Resul
         bail!("upload failed ({status}): {}", text.trim());
     }
     print!("{text}");
+    // ponytail: QR a stderr para no ensuciar el pipe; solo si es una terminal.
+    // Polaridad estándar (como `qrencode -t UTF8`): asume fondo claro; los
+    // lectores de celular modernos igual decodifican el invertido.
+    if std::io::stderr().is_terminal() {
+        eprintln!("{}", QrCode::new(text.trim())?.render::<Dense1x2>().quiet_zone(true).build());
+    }
     Ok(())
 }
 
