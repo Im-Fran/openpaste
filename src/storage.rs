@@ -1,7 +1,7 @@
 use crate::config::Storage as StorageCfg;
 use anyhow::Result;
 use bytes::Bytes;
-use object_store::{local::LocalFileSystem, aws::AmazonS3Builder, ObjectStore, PutPayload};
+use object_store::{local::LocalFileSystem, aws::AmazonS3Builder, ObjectStore, ObjectStoreExt, PutPayload};
 use std::sync::Arc;
 
 #[derive(Clone)]

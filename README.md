@@ -78,7 +78,7 @@ text to `curl` and nothing else.
 
 ## 📋 Requirements
 
-- **Rust** 1.80+ (`cargo`) — tested on 1.98
+- **Rust** 1.94+ (`cargo`) — tested on 1.99
 - **Git**
 - Optional: **Docker** 24+ with Compose v2, or **PostgreSQL** 14+ for a non-SQLite instance
 

@@ -2,26 +2,27 @@
 name = "openpaste"
 version = "0.3.0"
 edition = "2021"
+rust-version = "1.94"
 description = "Paste service for text, terminal output and binaries"
 license = "MIT"
 
 [dependencies]
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-std", "signal", "time"] }
-tower-http = { version = "0.6", features = ["cors", "trace"] }
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "any", "sqlite", "postgres"] }
-object_store = { version = "0.12", features = ["aws"] }
+tower-http = { version = "0.7", features = ["cors", "trace"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "any", "sqlite", "postgres"] }
+object_store = { version = "0.14", features = ["aws-base", "reqwest", "ring"] }
 clap = { version = "4", features = ["derive", "env"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
-nanoid = "0.4"
+nanoid = "0.5"
 mime_guess = "2"
 bytes = "1"
 dotenvy = "0.15"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream"] }
 rust-embed = { version = "8", optional = true }
 qrcode = { version = "0.14.1", default-features = false }
 # ponytail: -no-provider + rustls/ring reutiliza el ring que ya trae reqwest;

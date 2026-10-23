@@ -64,6 +64,11 @@ enum Cmd {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
+    // rustls 0.23 exige elegir proveedor, y reqwest 0.13 (rustls-no-provider) y
+    // axum-server toman el default del proceso; ring evita arrastrar aws-lc-rs.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .map_err(|_| anyhow::anyhow!("failed to install the rustls crypto provider"))?;
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env()
             .unwrap_or_else(|_| "openpaste=info,tower_http=warn".into()))
@@ -128,10 +133,6 @@ async fn serve(
         return Ok(());
     };
 
-    // rustls 0.23 exige elegir proveedor; ring ya viene con reqwest.
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .map_err(|_| anyhow::anyhow!("failed to install the rustls crypto provider"))?;
     let tls_cfg = RustlsConfig::from_pem_file(&tls.cert, &tls.key)
         .await
         .map_err(|e| anyhow::anyhow!("cannot load TLS_CERT '{}' / TLS_KEY '{}': {e}", tls.cert, tls.key))?;
