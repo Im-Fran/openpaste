@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sqlx::{any::AnyPoolOptions, AnyPool, Row};
+use sqlx::{any::AnyPoolOptions, AnyPool, AssertSqlSafe, Row};
 
 #[derive(Clone)]
 pub struct Db {
@@ -25,7 +25,8 @@ impl Paste {
 }
 
 // ponytail: sqlx's Any driver forwards SQL verbatim, so `?` breaks on postgres.
-// Naive rewrite is fine because every query here is a literal we control (no `?` inside strings).
+// Naive rewrite is fine because every query here is a literal we control (no `?` inside strings),
+// which is also why the result is safe to wrap in `AssertSqlSafe` for sqlx 0.9.
 fn q(sql: &str, postgres: bool) -> String {
     if !postgres {
         return sql.to_string();
@@ -66,7 +67,7 @@ impl Db {
              VALUES (?, ?, ?, ?, ?, ?, ?)",
             self.postgres,
         );
-        sqlx::query(&sql)
+        sqlx::query(AssertSqlSafe(sql))
             .bind(&p.id)
             .bind(&p.content)
             .bind(&p.storage_key)
@@ -85,7 +86,7 @@ impl Db {
              FROM pastes WHERE id = ?",
             self.postgres,
         );
-        let row = sqlx::query(&sql).bind(id).fetch_optional(&self.pool).await?;
+        let row = sqlx::query(AssertSqlSafe(sql)).bind(id).fetch_optional(&self.pool).await?;
         Ok(row.map(|r| Paste {
             id: r.get("id"),
             content: r.get("content"),
